@@ -1,3 +1,0 @@
-Analisei umas biblioteca, site, pa, e eu creio que tem como quebrar o pip do Vs Code sem ter que ficar fazendo um tanto de instalação para executar... 
-
-``pip install {biblioteca} --break-system-packages``
