@@ -1,4 +1,4 @@
-```bash
+
 def _scroll_mouse(self, event):
         """Redireciona scroll do mouse para o CTkScrollableFrame."""
         try:
