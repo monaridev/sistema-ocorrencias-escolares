@@ -1,0 +1,15 @@
+
+def _scroll_mouse(self, event):
+        """Redireciona scroll do mouse para o CTkScrollableFrame."""
+        try:
+
+            multiplicador = 3 
+            scroll_units = int(-1 * (event.delta / 120) * multiplicador)
+
+            self.scroll._parent_canvas.yview_scroll(
+                int(-1 * (event.delta / 120)), "units"
+            )
+        except Exception:
+            pass
+
+- nao tenho garantia que roda, nao sei se funciona, peguei do google, se possivel testar em computador virtual
