@@ -53,9 +53,9 @@ from reportlab.lib import colors
 #
 #   3. Preencha as três linhas abaixo:
 #
-EMAIL_REMETENTE = "anonysettings@gmail.com"
-SENHA_APP       = "gvzv zjlr fqwr yyjb"
-EMAIL_DESTINO   = "diogomonarifigueiredo@gmail.com"
+EMAIL_REMETENTE = "diogomonarifigueiredo@gmail.com"
+SENHA_APP       = "jkuo fyta wkek nied"
+EMAIL_DESTINO   = "fernandobrito01@professor.educacao.sp.gov.br"
 # ─────────────────────────────────────────────
 
 # Logo SP oficial (embutido)
@@ -494,7 +494,8 @@ class App(ctk.CTk):
         self.entry_pag_ata     = self._campo(f_fin, "Pág. no Livro de Ata:", 80)
         self.entry_atendida    = self._campo(f_fin, "Ocorrência atendida por:", 260)
         self.entry_ciencia     = self._campo(f_fin, "Ciência do Responsável:", 260)
-        self.entry_whatsapp    = self._campo(f_fin, "WhatsApp do Responsável:", 200, "Ex: 11999999999")
+        self.entry_whatsapp    = self._campo(f_fin, "Whatsapp Escolar:", 200, "11969011998")
+        self.entry_whatsapp.configure(state="readonly")
 
         # ── Botão ────────────────────────────────
         ctk.CTkButton(
