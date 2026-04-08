@@ -590,7 +590,7 @@ class App(ctk.CTk):
             
             # 3. POR ÚLTIMO, abre a pasta do Windows
             # Isso evita que a pasta do Windows não permita que o "pywhatkit" finalize o seu processo primeiro
-            os.startfile(os.path.join(os.path.expanduser("~"), "Documents", "Ocorrencias_JPII")) 
+            os.startfile(os.path.join(os.path.expanduser("~"), "One Drive", "Documents", "Ocorrencias_JPII")) 
         else:
             messagebox.showwarning(
                 "PDF gerado, mas e-mail falhou",
