@@ -235,7 +235,7 @@ def gerar_pdf(dados: dict) -> str:
         cy -= 0.52*cm
 
     # campo "Outra" descrição
-    if dados.get("outra_desc", "").strip():
+    if dados.get("oc11", False) and dados.get("outra_desc", "").strip():
         txt(f"   → {dados['outra_desc']}", 2.1*cm, cy, tamanho=8.5, cor=colors.HexColor("#333333"))
         cy -= 0.52*cm
 
