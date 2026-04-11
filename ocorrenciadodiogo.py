@@ -43,19 +43,11 @@ from reportlab.lib.utils import ImageReader
 #   CONFIGURAÇÕES DE EMAIL 
 # ─────────────────────────────────────────────
 
-#   1. Seguinte Fernando, ao invés de usar sempre um email de professor, que que eu pensei
-#      Você vai criar um email especializado para a escola, somenta para armazenar as ocorrências
-#      tipo "ocorrencias.jpII@gmail.com", ai ao inves de ter que sempre ficar alternando,  mantem um fixo de remetente e destino
-#      Deixando claro que o email_destino é pra voce por algum email final, que vai receber os pdf para imprimir, porque precisa por assinatura do responsavel
+#   1. EMAIL_REMETENTE = E-Mail Que está enviando
 
+#   2. SENHA_APP = Senha Gerada pelo Google --> "Gerenciar minha conta do Google" --> "Senhas de App"
 
-#   2. A senha_app, vo deixa um tutorial de como se vai gerar, eu sei que voce já sabe mas é sempre bom 
-#      Acessa o myaccount.google.com / vai em Segurança / Vai em 2 etapa, e ativa ela nesse email que voce criou
-#      / Ai depois se volta, e pesquisa ali na barrinha mesmo "Senhas de app", ai voce abre, cria uma
-#      O nome pode ser "ocorrencia", ou o que se preferir, não tem importancia, ai depois que você criar
-#      Ele vai te entregar uma senha pique "xxxx xxxx xxxx xxxx", se copia ela e mete aqui em baixo nesse senha_app
-
-#   3. Preencha as três linhas abaixo:
+#   3. EMAIL_DESTINO = E-Mail Que receberá 
 
 load_dotenv()
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
@@ -65,6 +57,8 @@ EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
 # ─────────────────────────────────────────────
 #   CONFIGURAÇÃO DO NÚMERO DO WHATSAPP 
 # ─────────────────────────────────────────────
+
+#   1.Whatsapp Que receberá as mensagens ( PyWhatKit Lib )
 
 WHATSAPP_ESCOLAR  =  "11964617542"
 
