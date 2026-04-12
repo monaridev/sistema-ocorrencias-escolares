@@ -38,6 +38,7 @@ from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 # ─────────────────────────────────────────────
 #   CONFIGURAÇÕES DE EMAIL 
@@ -60,7 +61,7 @@ EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
 
 #   1.Whatsapp Que receberá as mensagens ( PyWhatKit Lib )
 
-WHATSAPP_ESCOLAR  =  "11964617542"
+WHATSAPP_ESCOLAR = os.getenv("WHATSAPP_ESCOLAR")
 
 # ─────────────────────────────────────────────
 #   LISTAS DE OCORRÊNCIAS E PROVIDÊNCIAS
@@ -240,28 +241,22 @@ def gerar_pdf(dados: dict) -> str:
 
     cy -= 0.5*cm
     relato = dados.get("relato", "").strip()
-    # quebra manual do relato em linhas de ~90 chars
+    largura_util_pts = w - 3*cm
+
     palavras = relato.split()
     linhas, linha_atual = [], ""
     for p in palavras:
-        if len(linha_atual) + len(p) + 1 <= 90:
-            linha_atual += (" " if linha_atual else "") + p
+        teste = (linha_atual + " " + p).strip()
+        if stringWidth(teste, "Helvetica", 9) <= largura_util_pts:
+            linha_atual = teste
         else:
             linhas.append(linha_atual)
             linha_atual = p
     if linha_atual:
         linhas.append(linha_atual)
 
-    # garante ao menos 4 linhas para impressão
     while len(linhas) < 4:
         linhas.append("")
-
-    if len(linhas) > 8:
-        messagebox.showwarning(
-            "Relato muito longo",
-            f"O relato possui {len(linhas)} linhas, mas o PDF comporta no máximo 8.\n\n"
-            f"As linhas excedentes serão cortadas. Considere resumir o texto."
-        )
 
     for lh in linhas[:8]:
         txt(lh, 1.5*cm, cy, tamanho=9)
@@ -845,6 +840,27 @@ class App(ctk.CTk):
             )
             return
 
+        try:
+            data_obj = datetime.strptime(data, "%d/%m/%Y")
+            if data_obj.year < 2020 or data_obj.year > 2100:
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning(
+                "Data inválida",
+                f'A data "{data}" não é válida.\n\nUse o formato DD/MM/AAAA.\nExemplo: {datetime.now().strftime("%d/%m/%Y")}'
+            )
+            self.entry_data.focus()
+            return
+        
+        relato_atual = self.text_relato.get("1.0", "end-1c")
+        if len(relato_atual) > 400:
+            messagebox.showwarning(
+                "Relato muito longo",
+                f"O relato possui {len(relato_atual)} caracteres, mas o limite é 400.\n\n"
+                f"Reduza o texto antes de continuar."
+        )
+            self.text_relato.focus()  # já joga o cursor de volta pro campo
+            return  # ← bloqueia o envio
         resposta = messagebox.askyesno(
             "Confirmar",
             f"Deseja gerar e enviar a ocorrência de\n\n"
