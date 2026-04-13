@@ -4,7 +4,7 @@
   E.E. João Paulo II — Mauá/SP
 =============================================================
   Dependências:
-    pip install customtkinter reportlab pywhatkit
+    pip install customtkinter reportlab pywhatkit dotenv
 
   Configuração de E-mail:
     - EMAIL_REMETENTE  =  Email que estará enviando as ocorrências ( Fixo também. )
