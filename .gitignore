@@ -1,2 +1,26 @@
+# Variáveis de ambiente / credenciais
 .env
+.env.local
+.env.*.local
+
+# Arquivos gerados pelo PyWhatKit
 pywhatkit_db.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Build / executáveis
+build/
+dist/
+*.spec
+
+# Arquivos gerados pelo sistema
+Ocorrencias_JPII/
+*.pdf
