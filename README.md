@@ -35,6 +35,15 @@ Essa opção é recomendada para quem quer apenas usar o sistema, sem precisar c
 
 ---
 
+## Documentação e apresentação
+
+- [Documentação em PDF](docs/documentacao.pdf)
+- [Apresentação em PowerPoint](docs/documentacao.pptx)
+
+Esses materiais apresentam o problema, a solução proposta, a interface do sistema, o fluxo de funcionamento, as tecnologias utilizadas e o impacto real do projeto.
+
+---
+
 ## Tutorial visual de uso
 
 O repositório inclui um tutorial em imagem explicando o fluxo de uso do sistema, desde o preenchimento da ocorrência até o envio e geração do PDF.
@@ -138,6 +147,8 @@ requirements.txt
 .gitignore
 ocorrenciaescolar.py
 tutorial.png
+docs/documentacao.pdf
+docs/documentacao.pptx
 ```
 
 O projeto atualmente está concentrado no arquivo `ocorrenciaescolar.py`, que contém a interface, a geração do PDF, o envio por e-mail e a notificação por WhatsApp.
