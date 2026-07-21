@@ -1,4 +1,4 @@
-# Sistema de Ocorrências Escolar
+# Sistema de Ocorrências Escolares
 
 Histórico de evolução do sistema de registro de ocorrências disciplinares
 da E.E. João Paulo II.
