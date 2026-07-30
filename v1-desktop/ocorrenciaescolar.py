@@ -59,7 +59,7 @@ load_dotenv(dotenv_path=_ENV_PATH)
 
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
 SENHA_APP = os.getenv("SENHA_APP")
-EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
+EMAIL_DESTINO = os.getenv("EMAIL_DESTINO").split(",")
 
 # ─────────────────────────────────────────────
 #   CONFIGURAÇÃO DO NÚMERO DO WHATSAPP 
@@ -350,9 +350,9 @@ def gerar_pdf(dados: dict) -> str:
 def enviar_email(caminho_pdf: str, aluno: str, data: str) -> bool:
     try:
         msg = MIMEMultipart()
-        msg["From"]    = EMAIL_REMETENTE
-        msg["To"]      = EMAIL_DESTINO
-        msg["Subject"] = f"[Ocorrência] {aluno} — {data}"
+        msg["From"]  =  EMAIL_REMETENTE
+        msg["To"]  =  ", ".join(EMAIL_DESTINO)
+        msg["Subject"]  =  f"[Ocorrência] {aluno} — {data}"
 
         corpo = (
             f"Prezada Equipe Gestora,\n\n"
@@ -906,7 +906,7 @@ class App(ctk.CTk):
                 f"Deseja gerar e enviar a ocorrência de\n\n"
                 f"Aluno: {aluno}\n"
                 f"Data:  {data}\n\n"
-                f"O PDF será enviado para:\n{EMAIL_DESTINO}"
+                f"O PDF será enviado para:\n" + "\n".join(EMAIL_DESTINO)
             )
         if not resposta:
             return
@@ -968,12 +968,14 @@ class App(ctk.CTk):
                 # O sistema vai focar no Chrome agora
                 enviar_whatsapp(numero_wp, pdf_path, dados["aluno"])
 
-            # 2. SÓ DEPOIS de tentar ou enviar o Zap, mostra o aviso na tela
+           # 2. SÓ DEPOIS de tentar ou enviar o Zap, mostra o aviso na tela
             self._status_var.set("✅ Ocorrência enviada com sucesso!")
             self.btn_gerar.configure(text="✅  PDF Gerado e Enviado!", fg_color="#0A7C3A")
             messagebox.showinfo(
                 "Sucesso! ✅",
-                f"PDF gerado e enviado com sucesso!\n\nArquivo: {pdf_path}\nEnviado para: {EMAIL_DESTINO}"
+                f"PDF gerado e enviado com sucesso!\n\n"
+                f"Arquivo: {pdf_path}\n"
+                f"Enviado para:\n" + "\n".join(EMAIL_DESTINO)
             )
             # Restaura botão após sucesso
             self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
