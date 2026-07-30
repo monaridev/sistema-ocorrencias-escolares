@@ -50,7 +50,13 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 #   3. EMAIL_DESTINO = E-Mail Que receberá 
 
-load_dotenv()
+from pathlib import Path
+
+# Ancora a busca do .env na pasta onde este script está fisicamente,
+# independente de onde o Python é executado (evita quebrar ao mover pastas)
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
+
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
 SENHA_APP = os.getenv("SENHA_APP")
 EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
@@ -62,6 +68,29 @@ EMAIL_DESTINO = os.getenv("EMAIL_DESTINO")
 #   1.Whatsapp Que receberá as mensagens ( PyWhatKit Lib )
 
 WHATSAPP_ESCOLAR = os.getenv("WHATSAPP_ESCOLAR")
+
+_VARS_OBRIGATORIAS = {
+    "EMAIL_REMETENTE": EMAIL_REMETENTE,
+    "SENHA_APP": SENHA_APP,
+    "EMAIL_DESTINO": EMAIL_DESTINO,
+    "WHATSAPP_ESCOLAR": WHATSAPP_ESCOLAR,
+}
+_faltando = [nome for nome, valor in _VARS_OBRIGATORIAS.items() if not valor]
+
+# MODO_TESTE liga automaticamente quando o .env está ausente/incompleto.
+# Nesse modo o app apenas gera e salva o PDF localmente — não tenta
+# enviar e-mail nem abrir o WhatsApp. Assim dá pra testar a geração da
+# ficha sem precisar configurar credenciais.
+MODO_TESTE = bool(_faltando)
+
+if _faltando:
+    print(
+        f"[AVISO] As seguintes variáveis não foram carregadas do .env: {', '.join(_faltando)}\n"
+        f"        Verifique se o arquivo existe em: {_ENV_PATH}\n"
+        f"        Dica: copie o .env.example para .env nessa mesma pasta e preencha os valores.\n"
+        f"        Como o .env está incompleto, o app vai rodar em MODO_TESTE "
+        f"(gera e salva o PDF, mas não envia e-mail nem WhatsApp)."
+    )
 
 # ─────────────────────────────────────────────
 #   LISTAS DE OCORRÊNCIAS E PROVIDÊNCIAS
@@ -548,7 +577,8 @@ class App(ctk.CTk):
                  bg=COR_PRIMARIA, fg="#A8C4E8").pack(anchor="w")
 
         # Pill de status no canto direito
-        self._status_var = tk.StringVar(value="● Pronto para preencher")
+        status_inicial = "🧪 Modo teste — só salva PDF (sem e-mail/WhatsApp)" if MODO_TESTE else "● Pronto para preencher"
+        self._status_var = tk.StringVar(value=status_inicial)
         self._status_lbl = tk.Label(inner_h,
                                     textvariable=self._status_var,
                                     font=("Segoe UI", 9),
@@ -776,7 +806,7 @@ class App(ctk.CTk):
                                             border_width=1, border_color=COR_BORDA,
                                             fg_color="#EDEFF4", text_color=COR_SUBTEXTO,
                                             font=ctk.CTkFont(size=12))
-        self.entry_whatsapp.insert(0, WHATSAPP_ESCOLAR)
+        self.entry_whatsapp.insert(0, WHATSAPP_ESCOLAR or "")
         self.entry_whatsapp.configure(state="readonly")
         self.entry_whatsapp.pack(anchor="w")
 
@@ -861,13 +891,23 @@ class App(ctk.CTk):
         )
             self.text_relato.focus()  # já joga o cursor de volta pro campo
             return  # ← bloqueia o envio
-        resposta = messagebox.askyesno(
-            "Confirmar",
-            f"Deseja gerar e enviar a ocorrência de\n\n"
-            f"Aluno: {aluno}\n"
-            f"Data:  {data}\n\n"
-            f"O PDF será enviado para:\n{EMAIL_DESTINO}"
-        )
+        if MODO_TESTE:
+            resposta = messagebox.askyesno(
+                "Confirmar (modo teste)",
+                f"MODO TESTE — sem envio de e-mail/WhatsApp.\n\n"
+                f"Deseja gerar e salvar a ocorrência de\n\n"
+                f"Aluno: {aluno}\n"
+                f"Data:  {data}\n\n"
+                f"O PDF será salvo apenas localmente."
+            )
+        else:
+            resposta = messagebox.askyesno(
+                "Confirmar",
+                f"Deseja gerar e enviar a ocorrência de\n\n"
+                f"Aluno: {aluno}\n"
+                f"Data:  {data}\n\n"
+                f"O PDF será enviado para:\n{EMAIL_DESTINO}"
+            )
         if not resposta:
             return
 
@@ -897,6 +937,21 @@ class App(ctk.CTk):
             messagebox.showerror("Erro ao gerar PDF", str(e))
             self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
             self._status_var.set("● Erro ao gerar PDF")
+            return
+
+        if MODO_TESTE:
+            # Modo teste: não tenta e-mail nem WhatsApp, só confirma o PDF salvo.
+            self._status_var.set("✅ PDF salvo (modo teste)!")
+            self.btn_gerar.configure(text="✅  PDF Gerado (modo teste)!", fg_color="#0A7C3A")
+            messagebox.showinfo(
+                "PDF salvo (modo teste) ✅",
+                f"PDF gerado e salvo com sucesso!\n\nArquivo: {pdf_path}\n\n"
+                f"Envio de e-mail e WhatsApp foram pulados porque o .env "
+                f"está ausente/incompleto."
+            )
+            self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
+            self._status_var.set("● Pronto para novo registro (modo teste)")
+            os.startfile(os.path.join(os.path.expanduser("~"), "Documents", "Ocorrencias_JPII"))
             return
 
         self._status_var.set("● Enviando e-mail...")
