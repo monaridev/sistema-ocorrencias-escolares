@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.*.local
+credentials.json
+token.json
 
 # Arquivos gerados pelo PyWhatKit
 pywhatkit_db.txt

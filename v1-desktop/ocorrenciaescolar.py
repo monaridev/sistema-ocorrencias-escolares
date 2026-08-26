@@ -4,12 +4,12 @@
   E.E. João Paulo II — Mauá/SP
 =============================================================
   Dependências:
-    pip install customtkinter reportlab pywhatkit dotenv
+    pip install -r requirements.txt
 
   Configuração de E-mail:
     - EMAIL_REMETENTE  =  Email que estará enviando as ocorrências ( Fixo também. )
-    - SENHA_APP  =  senha de app gerada no Gmail  (Conta Google → Segurança → Senhas de app)
     - EMAIL_DESTINO  =  Email fixo para receber as ocorrências
+    - credentials.json  =  credenciais OAuth do Gmail API para aplicativo Desktop
 
   Configuração do Whatsapp:
     - WHATSAPP_ESCOLAR  =  Numero que vai receber as notificações
@@ -18,11 +18,10 @@
 
 import customtkinter as ctk
 from tkinter import messagebox
-import smtplib
 import os
 import base64 as _b64
 import io
-import pywhatkit
+import sys
 import tkinter as tk
 from PIL import Image, ImageTk
 from email.mime.multipart import MIMEMultipart
@@ -30,8 +29,13 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
@@ -45,21 +49,28 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 # ─────────────────────────────────────────────
 
 #   1. EMAIL_REMETENTE = E-Mail Que está enviando
+#   2. EMAIL_DESTINO = E-Mail Que receberá
+#   3. O envio usa Gmail API com OAuth 2.0 para aplicativo Desktop
 
-#   2. SENHA_APP = Senha Gerada pelo Google --> "Gerenciar minha conta do Google" --> "Senhas de App"
+# Ancora os arquivos externos na pasta do script ou, no aplicativo
+# empacotado, na mesma pasta do executável.
+if getattr(sys, "frozen", False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+else:
+    BASE_DIR = Path(__file__).resolve().parent
 
-#   3. EMAIL_DESTINO = E-Mail Que receberá 
-
-from pathlib import Path
-
-# Ancora a busca do .env na pasta onde este script está fisicamente,
-# independente de onde o Python é executado (evita quebrar ao mover pastas)
-_ENV_PATH = Path(__file__).resolve().parent / ".env"
+_ENV_PATH = BASE_DIR / ".env"
+_CREDENTIALS_PATH = BASE_DIR / "credentials.json"
+_TOKEN_PATH = BASE_DIR / "token.json"
+_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 load_dotenv(dotenv_path=_ENV_PATH)
 
 EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
-SENHA_APP = os.getenv("SENHA_APP")
-EMAIL_DESTINO = os.getenv("EMAIL_DESTINO").split(",")
+EMAIL_DESTINO = [
+    email.strip()
+    for email in os.getenv("EMAIL_DESTINO", "").split(",")
+    if email.strip()
+]
 
 # ─────────────────────────────────────────────
 #   CONFIGURAÇÃO DO NÚMERO DO WHATSAPP 
@@ -71,7 +82,6 @@ WHATSAPP_ESCOLAR = os.getenv("WHATSAPP_ESCOLAR")
 
 _VARS_OBRIGATORIAS = {
     "EMAIL_REMETENTE": EMAIL_REMETENTE,
-    "SENHA_APP": SENHA_APP,
     "EMAIL_DESTINO": EMAIL_DESTINO,
     "WHATSAPP_ESCOLAR": WHATSAPP_ESCOLAR,
 }
@@ -371,9 +381,36 @@ def enviar_email(caminho_pdf: str, aluno: str, data: str) -> bool:
         parte.add_header("Content-Disposition", f'attachment; filename="{os.path.basename(caminho_pdf)}"')
         msg.attach(parte)
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as servidor:
-            servidor.login(EMAIL_REMETENTE, SENHA_APP)
-            servidor.sendmail(EMAIL_REMETENTE, EMAIL_DESTINO, msg.as_string())
+        credenciais = None
+        if _TOKEN_PATH.exists():
+            credenciais = Credentials.from_authorized_user_file(
+                str(_TOKEN_PATH), _GMAIL_SCOPES
+            )
+
+        if not credenciais or not credenciais.valid:
+            if credenciais and credenciais.expired and credenciais.refresh_token:
+                credenciais.refresh(Request())
+            else:
+                if not _CREDENTIALS_PATH.exists():
+                    messagebox.showerror(
+                        "Erro ao enviar e-mail",
+                        f"Arquivo de autenticação do Gmail não encontrado.\n\n"
+                        f"Coloque o arquivo credentials.json em:\n{BASE_DIR}"
+                    )
+                    return False
+
+                fluxo = InstalledAppFlow.from_client_secrets_file(
+                    str(_CREDENTIALS_PATH), _GMAIL_SCOPES
+                )
+                credenciais = fluxo.run_local_server(port=0)
+
+            _TOKEN_PATH.write_text(credenciais.to_json(), encoding="utf-8")
+
+        mensagem_raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        servico = build("gmail", "v1", credentials=credenciais)
+        servico.users().messages().send(
+            userId="me", body={"raw": mensagem_raw}
+        ).execute()
 
         return True
     except Exception as e:
@@ -386,6 +423,8 @@ def enviar_email(caminho_pdf: str, aluno: str, data: str) -> bool:
 # ══════════════════════════════════════════════
 def enviar_whatsapp(numero: str, caminho_pdf: str, aluno: str) -> bool:
     try:
+        import pywhatkit
+
         numero_limpo = numero.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
         if not numero_limpo.startswith("+"):
             numero_limpo = "+55" + numero_limpo

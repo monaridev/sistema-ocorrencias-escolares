@@ -18,7 +18,7 @@ O sistema foi criado para transformar um processo manual da escola em um fluxo m
 - Registro de providências tomadas pela equipe gestora.
 - Geração automática de PDF em formato de ficha escolar.
 - Salvamento dos PDFs na pasta `Documents/Ocorrencias_JPII`.
-- Envio do PDF por e-mail usando SMTP/Gmail.
+- Envio do PDF por e-mail usando Gmail API com OAuth 2.0.
 - Notificação via WhatsApp usando PyWhatKit.
 - Configuração segura por variáveis de ambiente usando `.env`.
 
@@ -60,7 +60,8 @@ O repositório inclui um tutorial em imagem explicando o fluxo de uso do sistema
 - **ReportLab** — geração de PDF
 - **Pillow** — manipulação da imagem/logo no PDF e na interface
 - **python-dotenv** — leitura de variáveis de ambiente
-- **smtplib / email** — envio de e-mail
+- **Gmail API / Google OAuth 2.0** — envio autenticado de e-mail
+- **email** — montagem da mensagem MIME e do anexo
 - **PyWhatKit** — envio de mensagem via WhatsApp Web
 
 ---
@@ -99,12 +100,15 @@ Crie um arquivo chamado `.env` na raiz do projeto, seguindo o modelo do arquivo 
 
 ```env
 EMAIL_REMETENTE=seu_email@gmail.com
-SENHA_APP=sua_senha_de_app_do_google
-EMAIL_DESTINO=email_que_recebera_as_ocorrencias@gmail.com
+EMAIL_DESTINO=email_que_recebera_as_ocorrencias@gmail.com,outro_email@gmail.com
 WHATSAPP_ESCOLAR=11999999999
 ```
 
-> Para usar Gmail, é necessário gerar uma **Senha de App** na Conta Google. Não use sua senha normal da conta.
+O envio usa OAuth 2.0 e não exige credencial de e-mail no `.env`. Baixe no Google Cloud o arquivo OAuth de um cliente do tipo **Desktop App** e salve-o como `credentials.json` na mesma pasta de `ocorrenciaescolar.py`.
+
+Na primeira tentativa de envio, o navegador abrirá para login e autorização. Após a autorização, o sistema criará `token.json` na mesma pasta. Nas execuções seguintes esse token será reutilizado e renovado automaticamente quando necessário.
+
+Os arquivos `.env`, `credentials.json` e `token.json` são locais e não devem ser adicionados ao Git.
 
 ### 5. Execute o sistema
 
@@ -116,12 +120,41 @@ python ocorrenciaescolar.py
 
 ## Configuração do e-mail
 
-O sistema usa Gmail via SMTP. Para funcionar corretamente:
+O sistema usa a Gmail API oficial com OAuth 2.0 e somente a permissão `https://www.googleapis.com/auth/gmail.send`.
 
-1. Ative a verificação em duas etapas na conta Google.
-2. Gere uma senha de app.
-3. Coloque essa senha no campo `SENHA_APP` do arquivo `.env`.
-4. Configure `EMAIL_REMETENTE` e `EMAIL_DESTINO`.
+1. Ative a Gmail API no projeto do Google Cloud.
+2. Configure a tela de consentimento OAuth e um cliente do tipo **Desktop App**.
+3. Baixe o arquivo do cliente e salve-o localmente como `credentials.json`.
+4. Configure `EMAIL_REMETENTE` e `EMAIL_DESTINO` no `.env`. Para vários destinatários, separe os endereços por vírgula.
+5. Execute o sistema e conclua a primeira autorização no navegador.
+
+O `token.json` criado após essa autorização deve permanecer gravável, pois poderá ser atualizado durante a renovação das credenciais.
+
+---
+
+## Pacote portátil para Windows
+
+O build do Windows usa PyInstaller no modo `onedir`, que é mais confiável para incluir os arquivos de dados do CustomTkinter. A pasta portátil gerada é `dist/SistemaOcorrencias/` e deve ser copiada inteira.
+
+Na raiz dessa pasta ficam:
+
+```text
+SistemaOcorrencias/
+├── SistemaOcorrencias.exe
+├── .env
+├── credentials.json
+├── token.json
+└── _internal/
+```
+
+A pasta `_internal` contém as dependências empacotadas e é obrigatória. `.env`, `credentials.json` e `token.json` permanecem externos ao executável para permitir configuração e renovação do OAuth.
+
+Para repetir o build em uma máquina Windows:
+
+```bat
+python -m pip install -r requirements-build.txt
+build-windows.bat
+```
 
 ---
 
@@ -143,6 +176,8 @@ Antes de enviar:
 ```txt
 README.md
 requirements.txt
+requirements-build.txt
+build-windows.bat
 .env.example
 .gitignore
 ocorrenciaescolar.py
