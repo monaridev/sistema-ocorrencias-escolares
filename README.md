@@ -23,5 +23,3 @@ A V2 não depende de um PC da escola funcionando como servidor e não exige um b
 O histórico oficial é formado pelos dados estruturados do PostgreSQL. PDFs são gerados apenas quando necessários para envio ou uso administrativo e não fazem parte do histórico permanente.
 
 Consulte [`v2-mobile/docs/v2-decisoes-arquitetura.md`](./v2-mobile/docs/v2-decisoes-arquitetura.md) para as decisões atuais e [`v2-mobile/docs/plano_execucao.md`](./v2-mobile/docs/plano_execucao.md) para o plano de implementação.
-
-As [regras confirmadas](./v2-mobile/docs/regras_confirmadas.md) complementam esses documentos com permissões, auditoria, importação de alunos e configuração de destinatários de teste.
