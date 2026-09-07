@@ -1,138 +1,238 @@
-# Plano de execução — Sistema de Ocorrências (Desktop → Mobile + Backend)
+# Plano de execução — Sistema de Ocorrências V2
 
-> Este documento registra o plano de trabalho faseado para a refatoração do
-> Sistema de Ocorrências da E.E. João Paulo II. O objetivo é conduzir a
-> migração de forma incremental, com histórico de commits, PRs e testes que
-> demonstrem o processo de desenvolvimento, não apenas o resultado final.
+## 1. Objetivo
 
----
+Construir a V2 mobile de forma incremental, preservando histórico de commits, branches, PRs e testes pequenos.
 
-## 1. Visão geral
+A arquitetura atual é:
 
-A refatoração segue a arquitetura definida em `arquitetura_sistema_ocorrencias.docx`
-(v2, revisada com apoio do ChatGPT): backend em FastAPI como fonte da verdade,
-autenticação JWT desde a primeira versão, PDF gerado no servidor via ReportLab,
-histórico relacional em SQLite, e app mobile em Flutter consumindo uma API já
-estável.
+```text
+Flutter/Dart → Supabase Auth + PostgreSQL + RLS
+```
 
-Este plano define **como** essa arquitetura será construída ao longo do tempo:
-em fases pequenas, cada uma com sua branch, seu PR e seus testes mínimos.
+Não haverá FastAPI separado no MVP e não haverá dependência de um PC da escola funcionando como servidor.
+
+O histórico oficial será o PostgreSQL. PDFs serão gerados apenas quando necessários e não serão armazenados permanentemente como histórico.
 
 ---
 
-## 2. Cronograma faseado
+## 2. Regras funcionais que guiam a implementação
 
-| Fase | Descrição | Branch | Testes mínimos da fase |
+1. Cada professor terá uma conta própria.
+2. Cada ocorrência será vinculada ao professor autenticado que a criou.
+3. O professor poderá consultar suas próprias ocorrências completas.
+4. O histórico de um aluno reunirá ocorrências registradas por professores diferentes.
+5. O histórico resumido mostrará quantidade total, professor, motivo e data.
+6. Cada aluno terá ID próprio e turma associada.
+7. A quantidade de ocorrências será calculada diretamente dos registros do banco.
+8. O histórico será carregado sob demanda após pesquisa do aluno.
+9. RLS e consultas seguras devem proteger dados que não precisam ser visíveis a todos.
+10. PDF não será usado como banco de histórico.
+
+---
+
+## 3. Cronograma faseado
+
+| Fase | Descrição | Branch sugerida | Resultado mínimo |
 |---|---|---|---|
-| 0 | Preparação: estrutura de pastas, ADRs iniciais, setup do Obsidian | `docs/setup-inicial` | — |
-| 1 | Modelagem de dados (SQLModel): Ocorrencia, Usuario, Motivo, Providencia e tabelas de junção | `feature/modelagem-dados` | Modelo salva e recupera corretamente |
-| 2 | Autenticação: tabela de usuários, login, JWT, papéis (professor/gestor/admin) | `feature/auth-jwt` | Login retorna JWT válido; rota protegida rejeita acesso sem token |
-| 3 | Endpoint `POST /ocorrencia` (grava no banco, ainda sem PDF/e-mail) | `feature/endpoint-ocorrencia` | Professor autenticado cria ocorrência; usuário sem permissão não acessa histórico completo |
-| 4 | Desacoplar `gerar_pdf()` do Tkinter no projeto atual; depois portar para `pdf_service.py` | `refactor/pdf-desacoplado` → `feature/pdf-service` | PDF é gerado corretamente a partir de dados de exemplo |
-| 5 | Serviço de e-mail (background task), atualização de `email_status` | `feature/email-service` | Sucesso e falha no envio atualizam o status corretamente |
-| 6 | Testes de integração de ponta a ponta + coleção Postman | `test/integracao-api` | Fluxo completo: login → criar ocorrência → PDF → e-mail |
-| 7 | App Flutter — uma branch por tela | `feature/flutter-login`, `feature/flutter-formulario`, `feature/flutter-historico`, `feature/flutter-pdf-viewer` | Testes de widget básicos por tela |
-| 8 | Polimento, revisão de segurança, deploy do backend, documentação final | `chore/deploy` | — |
+| 0 | Atualizar documentação e preparar estrutura Flutter | `docs/arquitetura-v2-supabase` | Documentação consistente e projeto Flutter inicial executando |
+| 1 | Criar projeto Supabase e modelar tabelas principais | `feature/supabase-schema` | `profiles`, `students` e `occurrences` criadas com relacionamentos básicos |
+| 2 | Integrar Supabase Auth ao Flutter | `feature/auth-supabase` | Login funciona e o app conhece o usuário autenticado |
+| 3 | Implementar roles, RLS e acesso seguro ao histórico resumido | `feature/rls-permissoes` | Professor não consegue burlar permissões; consulta resumida funciona |
+| 4 | Implementar tela e fluxo de nova ocorrência | `feature/nova-ocorrencia` | Professor autenticado registra ocorrência vinculada ao próprio ID |
+| 5 | Implementar “Minhas ocorrências” | `feature/minhas-ocorrencias` | Professor consulta registros completos criados por ele |
+| 6 | Implementar pesquisa e histórico por aluno | `feature/historico-aluno` | Busca mostra aluno + turma + total; detalhe mostra professor, motivo e data |
+| 7 | Gerar PDF localmente a partir de uma ocorrência | `feature/pdf-mobile` | PDF é gerado sob demanda sem ser salvo como histórico permanente |
+| 8 | Integrar Gmail API para envio | `feature/gmail-api-mobile` | PDF pode ser enviado e o app informa sucesso/falha corretamente |
+| 9 | Testes de integração, segurança e UX | `test/integracao-v2` | Fluxos principais testados em Android e regras de acesso revisadas |
+| 10 | Empacotamento e validação na escola | `chore/release-v2` | APK de teste validado com usuários reais e documentação final atualizada |
 
-Cada fase é fechada com um Pull Request, mesmo em desenvolvimento solo — a
-auto-revisão antes do merge já documenta o raciocínio da mudança e cria
-histórico de discussão real no repositório.
+Não avançar várias fases de uma vez. Cada fase deve ser revisável e testável isoladamente.
 
 ---
 
-## 3. Estrutura de pastas do backend (referência da Fase 1 em diante)
+## 4. Modelagem inicial sugerida
 
+A Fase 1 deve começar simples.
+
+### `profiles`
+
+```text
+id          uuid  → auth.users.id
+nome        text
+role        text  → professor | gestor | admin
+ativo       bool
+created_at  timestamp
 ```
-backend/
-├── routers/
-│   ├── ocorrencias.py
-│   └── auth.py
-├── services/
-│   ├── occurrence_service.py
-│   ├── pdf_service.py
-│   ├── email_service.py
-│   └── storage_service.py
-├── repositories/
-│   └── occurrence_repository.py
-├── models/
-│   └── ... (entidades SQLModel)
-├── tests/
-│   └── ...
+
+### `students`
+
+```text
+id          uuid ou bigint
+nome        text
+turma       text
+ativo       bool
+created_at  timestamp
+```
+
+### `occurrences`
+
+```text
+id           uuid ou bigint
+student_id   FK → students.id
+created_by   FK → profiles.id
+motivo       text
+relato       text
+providencias text
+created_at   timestamp
+email_status text opcional
+```
+
+Motivos e providências podem virar tabelas relacionadas depois, se isso trouxer benefício real. Não normalizar por complexidade sem necessidade.
+
+---
+
+## 5. Segurança e permissões
+
+A interface não é a camada de segurança.
+
+O Supabase deve aplicar RLS desde cedo.
+
+### Regra mínima esperada
+
+- usuário autenticado pode inserir ocorrência apenas com `created_by = auth.uid()`;
+- professor pode ler os registros completos que ele criou;
+- gestor/admin pode receber permissões mais amplas;
+- histórico resumido entre professores deve expor apenas os campos necessários.
+
+Como RLS é orientada a linhas e o histórico compartilhado pode precisar esconder colunas como relato e providências, preferir uma view segura ou RPC específica para o resumo do aluno.
+
+Exemplo de saída dessa consulta:
+
+```text
+student_id
+professor_nome
+motivo
+data
+```
+
+O total deve ser calculado com `COUNT(*)` sobre as ocorrências do aluno.
+
+---
+
+## 6. Estrutura Flutter sugerida
+
+```text
+v2-mobile/
+├── lib/
+│   ├── main.dart
+│   ├── core/
+│   │   ├── supabase/
+│   │   └── config/
+│   ├── features/
+│   │   ├── auth/
+│   │   ├── occurrences/
+│   │   └── history/
+│   └── services/
+│       ├── pdf_service.dart
+│       └── email_service.dart
+├── test/
 └── docs/
-    └── adr/
 ```
 
-`routers/` cuida apenas de HTTP (entrada/saída). `services/` concentra a regra
-de negócio. `repositories/` isola o acesso ao banco. `storage_service.py`
-abstrai onde os PDFs ficam salvos (filesystem local hoje; S3/Cloud Storage no
-futuro, sem alterar a lógica de ocorrências).
+Evitar criar camadas e abstrações sem uso. A estrutura pode crescer conforme o projeto realmente precisar.
 
 ---
 
-## 4. Convenções de Git
+## 7. Fluxos mínimos de teste
 
-### Commits (Conventional Commits)
-- `feat:` — nova funcionalidade
-- `fix:` — correção de bug
-- `docs:` — apenas documentação
-- `test:` — apenas testes
-- `refactor:` — mudança de código sem alterar comportamento
-- `chore:` — configuração, dependências, deploy
+### Autenticação
 
-Exemplo: `feat: adiciona endpoint POST /ocorrencia`
+- login válido entra no app;
+- login inválido falha com mensagem adequada;
+- logout encerra a sessão.
 
-### Branches
-Prefixo por tipo, seguido de uma descrição curta:
-`feature/`, `refactor/`, `test/`, `docs/`, `chore/`
+### Nova ocorrência
 
-Exemplo: `feature/auth-jwt`
+- professor autenticado consegue salvar;
+- `created_by` corresponde ao usuário autenticado;
+- usuário não consegue registrar ocorrência fingindo ser outro professor.
 
-### Template de PR
-Todo PR deve conter:
-1. **O que mudou** — resumo objetivo
-2. **Como testar** — passos manuais ou comando de teste automatizado
-3. **Checklist**:
-   - [ ] Testes passando
-   - [ ] Documentação (`.md`) atualizada
-   - [ ] ADR criada/atualizada, se a mudança envolveu decisão de arquitetura
+### Minhas ocorrências
 
----
+- professor A vê seus registros completos;
+- professor A não recebe detalhes completos privados de professor B sem permissão apropriada.
 
-## 5. Testes mínimos da primeira versão
+### Histórico do aluno
 
-Lista base (expandir por fase, conforme a tabela da seção 2):
-- Login retorna JWT válido
-- Professor autenticado consegue criar ocorrência
-- Usuário sem permissão não acessa histórico completo
-- PDF é criado corretamente após uma ocorrência
-- Falha no envio de e-mail atualiza `email_status` corretamente
+- pesquisa retorna aluno e turma;
+- quantidade total corresponde aos registros reais;
+- registros de professores diferentes aparecem no resumo;
+- resumo mostra professor, motivo e data;
+- nenhum PDF é necessário para consultar histórico.
+
+### PDF e e-mail
+
+- PDF é criado sob demanda;
+- PDF não é persistido como histórico;
+- sucesso e falha no envio são informados corretamente.
 
 ---
 
-## 6. Estrutura do vault Obsidian
+## 8. Convenções de Git
 
+### Commits
+
+- `feat:` nova funcionalidade
+- `fix:` correção
+- `docs:` documentação
+- `test:` testes
+- `refactor:` mudança sem alterar comportamento
+- `chore:` configuração e manutenção
+
+### Pull Requests
+
+Cada PR deve responder:
+
+1. O que mudou?
+2. Como testar?
+3. Houve mudança de arquitetura ou permissão?
+4. A documentação precisa ser atualizada?
+
+Evitar um único PR que implemente a V2 inteira.
+
+---
+
+## 9. O que foi removido do plano antigo
+
+As seguintes decisões antigas não fazem mais parte da arquitetura atual do MVP:
+
+- FastAPI como backend obrigatório;
+- JWT próprio emitido pelo FastAPI;
+- SQLModel como camada de persistência principal;
+- SQLite como banco da V2;
+- diretório `backend/` obrigatório;
+- deploy separado de um servidor FastAPI;
+- PDF gerado obrigatoriamente no servidor.
+
+Foram substituídas por Supabase Auth, PostgreSQL, RLS e integração direta do Flutter com o Supabase.
+
+---
+
+## 10. Próximo passo imediato
+
+Depois de atualizar estes documentos no GitHub:
+
+1. criar/inicializar o projeto Flutter dentro de `v2-mobile`;
+2. criar o projeto Supabase;
+3. modelar apenas as tabelas essenciais;
+4. configurar autenticação;
+5. implementar e testar RLS antes de construir o fluxo completo de ocorrências.
+
+A prioridade da primeira etapa da V2 é provar este caminho mínimo:
+
+```text
+login → usuário autenticado → salvar ocorrência → recuperar registro com permissão correta
 ```
-00-Inbox/           → notas rápidas do dia a dia, organizadas depois
-01-ADRs/            → uma nota por decisão de arquitetura, espelhando
-                       /backend/docs/adr/ do repositório
-                       Ex.: "0001 - Backend como fonte da verdade"
-                            "0002 - JWT em vez de token fixo"
-                            "0003 - Tabelas relacionadas em vez de JSON"
-02-Sprints/         → uma nota por fase/semana: o que foi feito,
-                       bloqueios, o que ficou pendente
-03-Glossario/       → termos do domínio (ocorrência, providência,
-                       ficha disciplinar)
-04-Diagramas/       → export dos diagramas de arquitetura
-```
 
-As ADRs vivem nos dois lugares: rascunho e reflexão no Obsidian, versão final
-commitada como `.md` no repositório em `/backend/docs/adr/`.
-
----
-
-## 7. Princípio geral
-
-O ritmo é deliberadamente incremental: cada fase deve resultar em um PR
-pequeno, revisável, testável isoladamente — e não em um único commit grande
-"reescreve o sistema inteiro". O histórico do repositório deve, por si só,
-contar a história da migração.
+Somente depois disso avançar para histórico, PDF e Gmail API.
