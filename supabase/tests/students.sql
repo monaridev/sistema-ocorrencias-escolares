@@ -1,0 +1,26 @@
+\set ON_ERROR_STOP on
+begin;
+create function pg_temp.assert_true(value boolean,description text) returns void language plpgsql as $$ begin if value is distinct from true then raise exception 'FALHOU: %',description; end if; end $$;
+create function pg_temp.denied(statement text) returns boolean language plpgsql as $$ begin execute statement; return false; exception when others then return true; end $$;
+insert into auth.users(id) values('10000000-0000-0000-0000-000000000001'),('10000000-0000-0000-0000-000000000002'),('10000000-0000-0000-0000-000000000003');
+update public.profiles set ativo=true;
+update public.profiles set role='gestor' where id='10000000-0000-0000-0000-000000000002';
+update public.profiles set role='admin' where id='10000000-0000-0000-0000-000000000003';
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+select pg_temp.assert_true(pg_temp.denied($q$select public.import_students('[{"nome":"Pedro","turma":"2B"}]')$q$),'professor não cadastra');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+select pg_temp.assert_true(pg_temp.denied($q$select public.admin_update_profile('10000000-0000-0000-0000-000000000001','Professor','admin',true)$q$),'gestor não administra contas');
+select public.import_students('[{"nome":"Pedro","turma":"2B","ra":"001"}]');
+select pg_temp.assert_true(public.preview_students('[{"nome":" Pedro ","turma":"2b"}]')->0->>'state'='review','homônimo exige revisão');
+select pg_temp.assert_true(public.preview_students('[{"nome":"Outro nome","turma":"3A","ra":"001"}]')->0->>'state'='existing_ra','RA existente detectado');
+select pg_temp.assert_true(pg_temp.denied($q$select public.import_students('[{"nome":"Ana","turma":"1A"},{"nome":"Pedro","turma":"2B"}]')$q$),'revisão não resolvida bloqueia lote');
+select pg_temp.assert_true((select count(*)=1 from public.students),'lote inválido não grava parcialmente');
+select public.import_students('[{"nome":"Pedro","turma":"2B","decision":"new"}]');
+select pg_temp.assert_true((select count(*)=2 from public.students),'homônimo confirmado tem ID próprio');
+select pg_temp.assert_true(public.preview_students('[{"nome":"Ana","turma":"1A"},{"nome":"ana","turma":"1A"}]')->1->>'state'='review','duplicação interna detectada');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000003',true);
+select pg_temp.assert_true(pg_temp.denied($q$select public.admin_update_profile('10000000-0000-0000-0000-000000000003','Admin','professor',true)$q$),'último admin preservado');
+select public.admin_update_profile('10000000-0000-0000-0000-000000000001','Professor','professor',false);
+select pg_temp.assert_true((select not ativo from public.profiles where id='10000000-0000-0000-0000-000000000001'),'admin desativa conta');
+rollback;
