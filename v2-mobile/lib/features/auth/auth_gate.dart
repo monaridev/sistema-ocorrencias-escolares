@@ -49,7 +49,8 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     return FutureBuilder<UserProfile>(
       future: profile,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done &&
+            !snapshot.hasData) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );

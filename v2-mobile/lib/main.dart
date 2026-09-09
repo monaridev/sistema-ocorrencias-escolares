@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/app_theme.dart';
+import 'features/home/home_page.dart';
+import 'services/school_repository.dart';
 import 'core/config.dart';
 import 'features/auth/auth_gate.dart';
 import 'features/auth/auth_service.dart';
@@ -13,7 +16,18 @@ Future<void> main() async {
     await Supabase.initialize(url: config.url, publishableKey: config.key);
     auth = SupabaseAuthService(Supabase.instance.client);
   }
-  runApp(OcorrenciasApp(auth: auth));
+  runApp(
+    OcorrenciasApp(
+      auth: auth,
+      home: auth == null
+          ? null
+          : (user) => HomePage(
+              repository: SchoolRepository(Supabase.instance.client),
+              auth: auth!,
+              user: user,
+            ),
+    ),
+  );
 }
 
 class OcorrenciasApp extends StatelessWidget {
@@ -25,6 +39,9 @@ class OcorrenciasApp extends StatelessWidget {
     title: 'Ocorrências Escolares',
     debugShowCheckedModeBanner: false,
     theme: AppTheme.light,
+    locale: const Locale('pt', 'BR'),
+    supportedLocales: const [Locale('pt', 'BR')],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
     home: auth == null
         ? const SetupPage()
         : AuthGate(

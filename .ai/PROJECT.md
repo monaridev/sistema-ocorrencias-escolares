@@ -6,4 +6,4 @@ Padrões compartilhados consultados: https://github.com/monaridev/monari-ai-brai
 
 Manter implementação simples por feature, serviços fora de widgets, tema centralizado, commits pequenos, sem segredos ou artefatos gerados. Testar análise estática, regras de acesso, fluxos e Android real antes de declarar conclusão. Sem refatorações da V1.
 
-O usuário autorizou implementação incremental e testes no Redmi 8. Em conflitos ou decisões importantes não definidas, parar e perguntar.
+O usuário autorizou implementação incremental e testes primeiro no Redmi 8 e depois no Moto G30. No momento está sem aparelho e autorizou continuar com testes automatizados. Em conflitos ou decisões importantes não definidas, parar e perguntar.
