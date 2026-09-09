@@ -56,9 +56,15 @@ export async function handler(req: Request) {
       }&select=role,ativo`,
     );
     if (
-      !profile.ok || profile.data?.[0]?.role !== "admin" ||
+      !profile.ok || !["gestor", "admin"].includes(profile.data?.[0]?.role) ||
       !profile.data?.[0]?.ativo
-    ) return response({ error: "Somente admin administra contas." }, 403);
+    ) {
+      return response(
+        { error: "Somente gestão ou admin administra contas." },
+        403,
+      );
+    }
+    const isAdmin = profile.data[0].role === "admin";
     const body = await req.json();
     if (body.action === "list") {
       const page = Math.max(1, Math.trunc(Number(body.page) || 1));
@@ -78,7 +84,9 @@ export async function handler(req: Request) {
           id: u.id,
           email: u.email,
           ...profiles.data.find((p: { id: string }) => p.id === u.id),
-        })),
+        })).filter((u: { role?: string }) =>
+          isAdmin || (u.role !== "admin" && u.role !== undefined)
+        ),
         has_more: users.data.users.length === 50,
       });
     }
@@ -104,6 +112,12 @@ export async function handler(req: Request) {
         400,
       );
     }
+    if (!isAdmin && body.role === "admin") {
+      return response(
+        { error: "Gestão não pode promover ou criar admin." },
+        403,
+      );
+    }
     let id = body.id;
     if (body.action === "create") {
       const created = await api("/auth/v1/admin/users", {
@@ -122,6 +136,14 @@ export async function handler(req: Request) {
     } else if (typeof id !== "string" || !/^[0-9a-f-]{36}$/i.test(id)) {
       return response({ error: "Identificação inválida." }, 400);
     }
+    if (!isAdmin && body.action === "update") {
+      const target = await api(
+        `/rest/v1/profiles?id=eq.${encodeURIComponent(id)}&select=role`,
+      );
+      if (!target.ok || !target.data?.[0] || target.data[0].role === "admin") {
+        return response({ error: "Gestão não pode alterar admin." }, 403);
+      }
+    }
     const changed = await api("/rest/v1/rpc/admin_update_profile", {
       p_id: id,
       p_nome: nome,
@@ -137,7 +159,7 @@ export async function handler(req: Request) {
           : "Não foi possível alterar o perfil.",
       }, 409);
     }
-    if (body.action === "update") {
+    if (body.action === "update" && isAdmin) {
       const edited = await api(
         `/auth/v1/admin/users/${id}`,
         {

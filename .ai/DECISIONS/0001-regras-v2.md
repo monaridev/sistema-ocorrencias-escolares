@@ -1,5 +1,7 @@
 # ADR 0001 — Regras confirmadas da V2
 
+As regras de cadastro no fluxo e administração pela gestão foram atualizadas pela ADR 0002. As demais regras abaixo continuam válidas.
+
 Status: aceito pelo usuário em 07/09/2026. Complementa os documentos enviados; não muda a arquitetura Flutter + Supabase.
 
 ## Contas e permissões

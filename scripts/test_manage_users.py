@@ -16,10 +16,14 @@ for label in ('professor_b','gestor'):
         code,result=manage({'action':'update',**fields})
         assert code==200,('ativação',code,result)
         restricted=login(account)
-        assert manage({'action':'list'},restricted)[0]==403
+        status,listing=manage({'action':'list'},restricted)
+        assert status==(200 if label=='gestor' else 403)
+        if label=='gestor':
+            assert all(u['role']!='admin' for u in listing['users'])
+            assert manage({'action':'update',**fields},restricted)[0]==200
         assert manage({'action':'update',**fields,'role':'admin'},restricted)[0]==403
     finally:
         code,result=manage({'action':'update',**fields,'ativo':False})
         assert code==200,('desativação',code,result)
     assert manage({'action':'list'},restricted)[0] in (401,403)
-print('Edge Function real: admin autorizado; professor, gestor, conta inativa e anônimo bloqueados. Contas de teste desativadas.')
+print('Edge Function real: admin e gestor autorizados; promoção a admin, professor, conta inativa e anônimo bloqueados. Contas de teste desativadas.')

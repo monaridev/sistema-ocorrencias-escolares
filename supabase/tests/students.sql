@@ -10,7 +10,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
 select pg_temp.assert_true(pg_temp.denied($q$select public.import_students('[{"nome":"Pedro","turma":"2B"}]')$q$),'professor não cadastra');
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
-select pg_temp.assert_true(pg_temp.denied($q$select public.admin_update_profile('10000000-0000-0000-0000-000000000001','Professor','admin',true)$q$),'gestor não administra contas');
+select pg_temp.assert_true(pg_temp.denied($q$select public.admin_update_profile('10000000-0000-0000-0000-000000000001','Professor','admin',true)$q$),'gestor não promove admin');
 select public.import_students('[{"nome":"Pedro","turma":"2B","ra":"001"}]');
 select pg_temp.assert_true(public.preview_students('[{"nome":" Pedro ","turma":"2b"}]')->0->>'state'='review','homônimo exige revisão');
 select pg_temp.assert_true(public.preview_students('[{"nome":"Outro nome","turma":"3A","ra":"001"}]')->0->>'state'='existing_ra','RA existente detectado');
