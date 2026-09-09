@@ -1,0 +1,11 @@
+project_id = "ocorrencias-v2"
+
+[auth]
+enable_signup = false
+
+[functions.manage-users]
+# O handler valida JWT via Auth /user e papel ativo no banco em todas as chamadas.
+verify_jwt = false
+
+[functions.send-occurrence]
+verify_jwt=false

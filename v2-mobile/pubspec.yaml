@@ -1,0 +1,30 @@
+name: ocorrencias_escolares
+description: "Aplicativo de ocorrências escolares da E.E. João Paulo II."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  csv: ^6.0.0
+  excel: ^4.0.6
+  file_picker: ^12.2.0
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  supabase_flutter: ^2.17.2
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
