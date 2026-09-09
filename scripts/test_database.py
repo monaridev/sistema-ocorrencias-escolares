@@ -14,8 +14,8 @@ run('-d', 'postgres', '-c', f'CREATE DATABASE {name}')
 try:
     # Os papéis são globais e podem já existir no servidor de desenvolvimento.
     bootstrap = (root / 'supabase/tests/bootstrap.sql').read_text()
-    for role in ['anon', 'authenticated']:
-        bootstrap = bootstrap.replace(f'create role {role} nologin;', f"DO $$ BEGIN CREATE ROLE {role} NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
+    for role in ['anon', 'authenticated', 'service_role']:
+        bootstrap = bootstrap.replace(f'create role {role} nologin;' if role != 'service_role' else 'create role service_role nologin bypassrls;', f"DO $$ BEGIN CREATE ROLE {role} NOLOGIN {'BYPASSRLS' if role == 'service_role' else ''}; EXCEPTION WHEN duplicate_object THEN NULL; END $$;")
     subprocess.run(['psql','-X','-v','ON_ERROR_STOP=1','-d',name], input=bootstrap, text=True, check=True)
     for migration in sorted((root / 'supabase/migrations').glob('*.sql')):
         run('-d',name,'-f',str(migration))
