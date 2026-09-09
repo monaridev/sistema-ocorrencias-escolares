@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 String friendlyError(Object error) {
+  if (error is PostgrestException && error.code == '23505') {
+    return 'Já existe um cadastro com esse identificador. Confira o RA/matrícula.';
+  }
   if (error is PostgrestException && error.code == 'P0001') {
     return error.message;
   }

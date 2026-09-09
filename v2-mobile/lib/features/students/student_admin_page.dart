@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'student_search_page.dart';
+import 'student_edit_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../core/feedback.dart';
@@ -123,6 +125,30 @@ class _StudentAdminPageState extends State<StudentAdminPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            OutlinedButton(
+              onPressed: busy
+                  ? null
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => StudentSearchPage(
+                          repository: widget.repository,
+                          title: 'Pesquisar aluno para corrigir',
+                          onSelect: (context, s) => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => StudentEditPage(
+                                repository: widget.repository,
+                                id: s.id,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+              child: const Text('Pesquisar / corrigir alunos'),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: name,
               enabled: !busy,

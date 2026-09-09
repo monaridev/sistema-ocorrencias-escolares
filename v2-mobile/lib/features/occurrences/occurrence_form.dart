@@ -5,6 +5,7 @@ import '../../core/feedback.dart';
 import '../../core/occurrence_options.dart';
 import '../../services/school_repository.dart';
 import '../students/student_search_page.dart';
+import '../students/occurrence_student_picker.dart';
 
 class OccurrenceForm extends StatefulWidget {
   const OccurrenceForm({super.key, required this.repository, this.existing});
@@ -20,6 +21,7 @@ class _OccurrenceFormState extends State<OccurrenceForm> {
       justification = TextEditingController();
   final id = const Uuid().v4();
   Student? student;
+  bool newStudent = false;
   late DateTime date;
   Set<String> reasons = {}, actions = {};
   bool busy = false;
@@ -46,6 +48,22 @@ class _OccurrenceFormState extends State<OccurrenceForm> {
   }
 
   Future<void> pickStudent() async {
+    if (widget.existing == null) {
+      final selection = await Navigator.push<OccurrenceStudentSelection>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OccurrenceStudentPicker(repository: widget.repository),
+        ),
+      );
+      if (selection != null && mounted) {
+        setState(() {
+          student = selection.student;
+          newStudent = selection.isNew;
+        });
+      }
+      return;
+    }
     final selected = await Navigator.push<Student>(
       context,
       MaterialPageRoute(
@@ -76,6 +94,8 @@ class _OccurrenceFormState extends State<OccurrenceForm> {
       pending = {
         'p_id': widget.existing?.id ?? id,
         'p_student_id': student!.id,
+        if (newStudent) 'p_nome': student!.name,
+        if (newStudent) 'p_turma': student!.group,
         'p_date': isoDate(date),
         'p_motivos': reasons
             .map(
@@ -96,7 +116,11 @@ class _OccurrenceFormState extends State<OccurrenceForm> {
     });
     try {
       if (widget.existing == null) {
-        await widget.repository.create(pending!);
+        if (newStudent) {
+          await widget.repository.createWithStudent(pending!);
+        } else {
+          await widget.repository.create(pending!);
+        }
       } else {
         await widget.repository.correct(pending!);
       }

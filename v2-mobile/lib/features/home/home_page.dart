@@ -87,20 +87,26 @@ class HomePage extends StatelessWidget {
                 label: const Text('Configurar e-mail'),
               ),
               const SizedBox(height: 16),
+            ],
+            if (user.isManager) ...[
               OutlinedButton.icon(
-                onPressed: () =>
-                    open(context, AccountsPage(repository: repository)),
+                onPressed: () => open(
+                  context,
+                  AccountsPage(
+                    repository: repository,
+                    allowAdmin: user.isAdmin,
+                  ),
+                ),
                 icon: const Icon(Icons.manage_accounts),
                 label: const Text('Administrar contas'),
               ),
-            ],
-            if (user.isManager) ...[
+
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () =>
                     open(context, StudentAdminPage(repository: repository)),
                 icon: const Icon(Icons.group_add_outlined),
-                label: const Text('Cadastrar alunos'),
+                label: const Text('Administrar alunos'),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(

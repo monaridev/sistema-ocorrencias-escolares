@@ -4,6 +4,29 @@ import '../core/models.dart';
 class SchoolRepository {
   SchoolRepository(this.client);
   final SupabaseClient client;
+  Future<Map<String, dynamic>> studentRecord(String id) async =>
+      await client.from('students').select().eq('id', id).single();
+  Future<void> correctStudent(Map<String, dynamic> data) async {
+    await client.rpc('correct_student', params: data);
+  }
+
+  Future<void> mergeStudents(Map<String, dynamic> data) async {
+    await client.rpc('merge_students', params: data);
+  }
+
+  Future<List<Map<String, dynamic>>> studentMatches(
+    String name,
+    String group,
+  ) async => List<Map<String, dynamic>>.from(
+    await client.rpc(
+      'find_student_matches',
+      params: {'p_nome': name, 'p_turma': group},
+    ),
+  );
+  Future<void> createWithStudent(Map<String, dynamic> payload) async {
+    await client.rpc('create_occurrence_with_student', params: payload);
+  }
+
   Future<List<Student>> search(String query, {int offset = 0}) async {
     final rows = await client.rpc(
       'search_students',

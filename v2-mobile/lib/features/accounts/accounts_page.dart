@@ -3,8 +3,13 @@ import '../../services/school_repository.dart';
 import '../../core/feedback.dart';
 
 class AccountsPage extends StatefulWidget {
-  const AccountsPage({super.key, required this.repository});
+  const AccountsPage({
+    super.key,
+    required this.repository,
+    this.allowAdmin = false,
+  });
   final SchoolRepository repository;
+  final bool allowAdmin;
   @override
   State<AccountsPage> createState() => _AccountsPageState();
 }
@@ -50,7 +55,11 @@ class _AccountsPageState extends State<AccountsPage> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AccountForm(repository: widget.repository, user: user),
+        builder: (_) => AccountForm(
+          repository: widget.repository,
+          user: user,
+          allowAdmin: widget.allowAdmin,
+        ),
       ),
     );
     if (mounted) await load(reset: true);
@@ -99,8 +108,14 @@ class _AccountsPageState extends State<AccountsPage> {
 }
 
 class AccountForm extends StatefulWidget {
-  const AccountForm({super.key, required this.repository, this.user});
+  const AccountForm({
+    super.key,
+    required this.repository,
+    this.user,
+    this.allowAdmin = false,
+  });
   final SchoolRepository repository;
+  final bool allowAdmin;
   final Map<String, dynamic>? user;
   @override
   State<AccountForm> createState() => _AccountFormState();
@@ -187,7 +202,7 @@ class _AccountFormState extends State<AccountForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: email,
-              enabled: !busy,
+              enabled: !busy && (widget.user == null || widget.allowAdmin),
               keyboardType: TextInputType.emailAddress,
               decoration: const InputDecoration(labelText: 'E-mail'),
               validator: (s) =>
@@ -200,7 +215,7 @@ class _AccountFormState extends State<AccountForm> {
             const SizedBox(height: 16),
             TextFormField(
               controller: password,
-              enabled: !busy,
+              enabled: !busy && (widget.user == null || widget.allowAdmin),
               obscureText: true,
               enableSuggestions: false,
               autocorrect: false,
@@ -220,7 +235,11 @@ class _AccountFormState extends State<AccountForm> {
               initialValue: role,
               decoration: const InputDecoration(labelText: 'Papel'),
               items: [
-                for (final r in ['professor', 'gestor', 'admin'])
+                for (final r in [
+                  'professor',
+                  'gestor',
+                  if (widget.allowAdmin) 'admin',
+                ])
                   DropdownMenuItem(value: r, child: Text(r)),
               ],
               onChanged: busy ? null : (v) => setState(() => role = v!),
