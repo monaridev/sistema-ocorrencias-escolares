@@ -1,9 +1,11 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ocorrencias_escolares/core/models.dart';
 import 'package:ocorrencias_escolares/services/occurrence_pdf.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('PDF exige registro completo e identifica cancelamento', () async {
     final o = Occurrence({
       'id': '11111111-1111-1111-1111-111111111111',
@@ -35,4 +37,21 @@ void main() {
       throwsStateError,
     );
   });
+  final cases =
+      jsonDecode(File('test/fixtures/pdf_v1.json').readAsStringSync())
+          as Map<String, dynamic>;
+  for (final entry in cases.entries) {
+    test('Modelo V1: ${entry.key}', () async {
+      final bytes = await occurrencePdf(
+        Occurrence(Map<String, dynamic>.from(entry.value)),
+        generatedAt: DateTime.utc(2026, 9, 9, 15),
+      );
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      final dir = Platform.environment['PDF_QA_DIR'];
+      if (dir != null) {
+        await Directory(dir).create(recursive: true);
+        await File('$dir/flutter-${entry.key}.pdf').writeAsBytes(bytes);
+      }
+    });
+  }
 }

@@ -1,4 +1,5 @@
-import { PDFDocument, rgb, StandardFonts } from "npm:pdf-lib@1.17.1";
+import { canonicalPdf } from "./occurrence-pdf.ts";
+export { canonicalPdf } from "./occurrence-pdf.ts";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -15,88 +16,6 @@ export const base64 = (bytes: Uint8Array) => {
   for (const byte of bytes) s += String.fromCharCode(byte);
   return btoa(s);
 };
-type RecordData = {
-  id: string;
-  version: number;
-  status: string;
-  students: { nome: string; turma: string; ra?: string };
-  professor: string;
-  occurrence_date: string;
-  motivos: string[];
-  relato: string;
-  providencias: string[];
-  change_reason?: string;
-};
-export async function canonicalPdf(o: RecordData) {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  let page = doc.addPage([595.28, 841.89]), y = 788;
-  const line = (text: string, size = 11, strong = false) => {
-    if (y < 65) {
-      page = doc.addPage([595.28, 841.89]);
-      y = 788;
-    }
-    page.drawText(text, {
-      x: 40,
-      y,
-      size,
-      font: strong ? bold : font,
-      color: strong ? rgb(.04, .17, .37) : rgb(0, 0, 0),
-    });
-    y -= size + 6;
-  };
-  // Quebrar inclusive palavras longas; símbolos não suportados causam erro antes do envio.
-  const paragraph = (text: string, strong = false) => {
-    let row = "";
-    for (const char of text.normalize("NFC")) {
-      if (char === "\r") continue;
-      if (char === "\n" || font.widthOfTextAtSize(row + char, 11) > 510) {
-        line(row, 11, strong);
-        row = "";
-        if (char === "\n") continue;
-      }
-      row += char;
-    }
-    if (row) line(row, 11, strong);
-    y -= 5;
-  };
-  line("E.E. JOÃO PAULO II", 18, true);
-  line("Ficha de ocorrência escolar", 13);
-  y -= 14;
-  if (o.status === "cancelled") {
-    line("CANCELADA", 16, true);
-    paragraph(o.change_reason ?? "");
-  }
-  paragraph(`Aluno: ${o.students.nome}`);
-  paragraph(`Turma: ${o.students.turma}`);
-  if (o.students.ra) paragraph(`RA/matrícula: ${o.students.ra}`);
-  paragraph(`Professor: ${o.professor}`);
-  paragraph(`Data: ${o.occurrence_date.split("-").reverse().join("/")}`);
-  paragraph("Motivos", true);
-  for (const reason of o.motivos) paragraph("- " + reason);
-  paragraph("Relato", true);
-  paragraph(o.relato || "Não informado");
-  paragraph("Providências", true);
-  for (const action of o.providencias) paragraph("- " + action);
-  if (!o.providencias.length) paragraph("Não informadas");
-  const pages = doc.getPages();
-  pages.forEach((p, i) => {
-    p.drawText(`Registro ${o.id} | Versão ${o.version}`, {
-      x: 40,
-      y: 36,
-      size: 8,
-      font,
-    });
-    p.drawText(`Histórico oficial no sistema. | ${i + 1}/${pages.length}`, {
-      x: 40,
-      y: 24,
-      size: 8,
-      font,
-    });
-  });
-  return doc.save();
-}
 export function mimeMessage(
   sender: string,
   recipients: string[],

@@ -30,3 +30,15 @@ O APK debug é de validação. Assinatura definitiva de distribuição ainda dev
 Última situação: aparelho indisponível por decisão do usuário; autorização e envio real do Gmail adiados. Testes automatizados e build não substituem essa validação no aparelho.
 
 Regras atualizadas: `.ai/DECISIONS/0002-cadastro-no-fluxo-e-gestao.md`. Em Administrar alunos, gestor/admin podem corrigir cadastro e unir históricos duplicados, sempre com justificativa. Na união, conferir canceladas visíveis e excluídas da contagem. O APK dessa mudança ainda precisa ser instalado no Moto G30, que desconectou durante a atualização.
+
+## Regressão do modelo PDF da V1 (09/09/2026)
+
+O renderer Flutter e o renderer da Edge Function reproduzem as coordenadas e fontes da V1, inclusive o PNG original. Campos administrativos sem dados ficam em branco. Textos excedentes seguem na continuação. Cancelamentos são identificados em todas as páginas.
+
+Validação reproduzível (dados sintéticos):
+
+1. Na pasta `v2-mobile`: `PDF_QA_DIR=/tmp/ocorrencias-pdf-v1 flutter test test/occurrence_pdf_test.dart`.
+2. Na raiz: `PDF_QA_DIR=/tmp/ocorrencias-pdf-v1 deno test --allow-env --allow-write supabase/functions/send-occurrence/occurrence-pdf_test.ts`.
+3. Na raiz, com ReportLab, Pillow e pypdf: `python3 scripts/test_pdf_layout.py /tmp/ocorrencias-pdf-v1`.
+
+O terceiro passo executa apenas o gerador original da V1 em diretório temporário, sem importar sua interface ou integrações. Compara fontes, posições, opções, caixas de seleção e logo com a V1, além de conferir equivalência entre aplicativo/servidor e preservação dos textos. Casos: ficha normal, Outro curto, Outro de 450 caracteres com relato de 400, palavra longa e cancelamento. PDFs também foram renderizados e inspecionados visualmente.
