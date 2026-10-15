@@ -6,12 +6,7 @@
   Dependências:
     pip install -r requirements.txt
 
-  Configuração de E-mail:
-    - EMAIL_REMETENTE  =  Email que estará enviando as ocorrências ( Fixo também. )
-    - EMAIL_DESTINO  =  Email fixo para receber as ocorrências
-    - credentials.json  =  credenciais OAuth do Gmail API para aplicativo Desktop
-
-  Configuração do Whatsapp:
+  Configuração do WhatsApp:
     - WHATSAPP_ESCOLAR  =  Numero que vai receber as notificações
 =============================================================
 """
@@ -24,18 +19,10 @@ import io
 import sys
 import tkinter as tk
 from PIL import Image, ImageTk
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
 from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
@@ -45,12 +32,11 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
 # ─────────────────────────────────────────────
-#   CONFIGURAÇÕES DE EMAIL 
+#   CONFIGURAÇÕES (WhatsApp + PDF local)
 # ─────────────────────────────────────────────
 
-#   1. EMAIL_REMETENTE = E-Mail Que está enviando
-#   2. EMAIL_DESTINO = E-Mail Que receberá
-#   3. O envio usa Gmail API com OAuth 2.0 para aplicativo Desktop
+#   WHATSAPP_ESCOLAR = número que recebe a notificação via WhatsApp
+#   O app gera o PDF localmente e notifica via WhatsApp. Não há envio de e-mail.
 
 # Ancora os arquivos externos na pasta do script ou, no aplicativo
 # empacotado, na mesma pasta do executável.
@@ -60,17 +46,7 @@ else:
     BASE_DIR = Path(__file__).resolve().parent
 
 _ENV_PATH = BASE_DIR / ".env"
-_CREDENTIALS_PATH = BASE_DIR / "credentials.json"
-_TOKEN_PATH = BASE_DIR / "token.json"
-_GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 load_dotenv(dotenv_path=_ENV_PATH)
-
-EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE")
-EMAIL_DESTINO = [
-    email.strip()
-    for email in os.getenv("EMAIL_DESTINO", "").split(",")
-    if email.strip()
-]
 
 # ─────────────────────────────────────────────
 #   CONFIGURAÇÃO DO NÚMERO DO WHATSAPP 
@@ -81,16 +57,13 @@ EMAIL_DESTINO = [
 WHATSAPP_ESCOLAR = os.getenv("WHATSAPP_ESCOLAR")
 
 _VARS_OBRIGATORIAS = {
-    "EMAIL_REMETENTE": EMAIL_REMETENTE,
-    "EMAIL_DESTINO": EMAIL_DESTINO,
     "WHATSAPP_ESCOLAR": WHATSAPP_ESCOLAR,
 }
 _faltando = [nome for nome, valor in _VARS_OBRIGATORIAS.items() if not valor]
 
 # MODO_TESTE liga automaticamente quando o .env está ausente/incompleto.
 # Nesse modo o app apenas gera e salva o PDF localmente — não tenta
-# enviar e-mail nem abrir o WhatsApp. Assim dá pra testar a geração da
-# ficha sem precisar configurar credenciais.
+# abrir o WhatsApp. Assim dá pra testar a geração da ficha sem configurar nada.
 MODO_TESTE = bool(_faltando)
 
 if _faltando:
@@ -99,7 +72,7 @@ if _faltando:
         f"        Verifique se o arquivo existe em: {_ENV_PATH}\n"
         f"        Dica: copie o .env.example para .env nessa mesma pasta e preencha os valores.\n"
         f"        Como o .env está incompleto, o app vai rodar em MODO_TESTE "
-        f"(gera e salva o PDF, mas não envia e-mail nem WhatsApp)."
+        f"(gera e salva o PDF, mas não envia WhatsApp)."
     )
 
 # ─────────────────────────────────────────────
@@ -109,7 +82,7 @@ if _faltando:
 
 OCORRENCIAS = [
     ("oc1",  "Portar materiais e/ou equipamentos não pertencentes à aula"),
-    ("oc2",  "Usar celular durante a aula"),
+    ("oc2",  "Usar celular durante a aula (Lei Federal nº 15.100/25)"),
     ("oc3",  "Não portar os materiais mínimos necessários à aula"),
     ("oc4",  "Não realizar as atividades propostas durante a aula"),
     ("oc5",  "Sair sem autorização do professor da sala de aula"),
@@ -123,7 +96,7 @@ OCORRENCIAS = [
 
 PROVIDENCIAS = [
     ("pv1", "Admoestação verbal"),
-    ("pv2", "Registro em livro de Ocorrência"),
+    ("pv2", "Registro no Conviva"),
     ("pv3", "Convocação do pai ou responsável à U.E."),
     ("pv4", "Encaminhamento ao Conselho de Escola"),
     ("pv5", "Pedir trabalho de pesquisa sobre a lei aplicável"),
@@ -237,6 +210,12 @@ def gerar_pdf(dados: dict) -> str:
 
     txt("Data: ", 1.5*cm, cy, tamanho=9, bold=True)
     txt(dados["data"], 2.4*cm, cy, tamanho=9)   # ← 2.6cm (data curta)
+    cy -= 0.52*cm
+
+    txt("Aula: ", 1.5*cm, cy, tamanho=9, bold=True)
+    txt(dados.get("aula", ""), 2.5*cm, cy, tamanho=9)
+    txt("Horário: ", 5.5*cm, cy, tamanho=9, bold=True)
+    txt(dados.get("horario", ""), 7.1*cm, cy, tamanho=9)
     cy -= 0.52*cm
 
     txt("Relatado por: ", 1.5*cm, cy, tamanho=9, bold=True)
@@ -355,70 +334,6 @@ def gerar_pdf(dados: dict) -> str:
 
 
 # ══════════════════════════════════════════════
-#   ENVIO DE EMAIL
-# ══════════════════════════════════════════════
-def enviar_email(caminho_pdf: str, aluno: str, data: str) -> bool:
-    try:
-        msg = MIMEMultipart()
-        msg["From"]  =  EMAIL_REMETENTE
-        msg["To"]  =  ", ".join(EMAIL_DESTINO)
-        msg["Subject"]  =  f"[Ocorrência] {aluno} — {data}"
-
-        corpo = (
-            f"Prezada Equipe Gestora,\n\n"
-            f"Segue em anexo a Ficha de Ocorrência Disciplinar do(a) aluno(a) "
-            f"{aluno}, registrada em {data}.\n\n"
-            f"O documento foi gerado automaticamente pelo sistema de ocorrências "
-            f"da E.E. João Paulo II.\n\n"
-            f"Atenciosamente,\nSistema de Ocorrências"
-        )
-        msg.attach(MIMEText(corpo, "plain", "utf-8"))
-
-        with open(caminho_pdf, "rb") as f:
-            parte = MIMEBase("application", "octet-stream")
-            parte.set_payload(f.read())
-        encoders.encode_base64(parte)
-        parte.add_header("Content-Disposition", f'attachment; filename="{os.path.basename(caminho_pdf)}"')
-        msg.attach(parte)
-
-        credenciais = None
-        if _TOKEN_PATH.exists():
-            credenciais = Credentials.from_authorized_user_file(
-                str(_TOKEN_PATH), _GMAIL_SCOPES
-            )
-
-        if not credenciais or not credenciais.valid:
-            if credenciais and credenciais.expired and credenciais.refresh_token:
-                credenciais.refresh(Request())
-            else:
-                if not _CREDENTIALS_PATH.exists():
-                    messagebox.showerror(
-                        "Erro ao enviar e-mail",
-                        f"Arquivo de autenticação do Gmail não encontrado.\n\n"
-                        f"Coloque o arquivo credentials.json em:\n{BASE_DIR}"
-                    )
-                    return False
-
-                fluxo = InstalledAppFlow.from_client_secrets_file(
-                    str(_CREDENTIALS_PATH), _GMAIL_SCOPES
-                )
-                credenciais = fluxo.run_local_server(port=0)
-
-            _TOKEN_PATH.write_text(credenciais.to_json(), encoding="utf-8")
-
-        mensagem_raw = _b64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
-        servico = build("gmail", "v1", credentials=credenciais)
-        servico.users().messages().send(
-            userId="me", body={"raw": mensagem_raw}
-        ).execute()
-
-        return True
-    except Exception as e:
-        messagebox.showerror("Erro ao enviar e-mail", str(e))
-        return False
-
-
-# ══════════════════════════════════════════════
 #   ENVIO POR WHATSAPP
 # ══════════════════════════════════════════════
 def enviar_whatsapp(numero: str, caminho_pdf: str, aluno: str) -> bool:
@@ -428,7 +343,7 @@ def enviar_whatsapp(numero: str, caminho_pdf: str, aluno: str) -> bool:
         numero_limpo = numero.strip().replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
         if not numero_limpo.startswith("+"):
             numero_limpo = "+55" + numero_limpo
-        mensagem = f"Venho por meio desta mensagem, notificar que o aluno {aluno} recebeu uma ocorrência na sala de aula; verifique seu e-mail para ver a ocorrência ou aguarde o envio do PDF."
+        mensagem = f"Venho por meio desta mensagem, notificar que o aluno {aluno} recebeu uma ocorrência na sala de aula; o PDF foi gerado e salvo na pasta de ocorrências da escola."
         pywhatkit.sendwhatmsg_instantly(numero_limpo, mensagem, wait_time=15, tab_close=False)
         return True
     except Exception as e:
@@ -616,7 +531,7 @@ class App(ctk.CTk):
                  bg=COR_PRIMARIA, fg="#A8C4E8").pack(anchor="w")
 
         # Pill de status no canto direito
-        status_inicial = "🧪 Modo teste — só salva PDF (sem e-mail/WhatsApp)" if MODO_TESTE else "● Pronto para preencher"
+        status_inicial = "🧪 Modo teste — só salva PDF (sem WhatsApp)" if MODO_TESTE else "● Pronto para preencher"
         self._status_var = tk.StringVar(value=status_inicial)
         self._status_lbl = tk.Label(inner_h,
                                     textvariable=self._status_var,
@@ -703,6 +618,38 @@ class App(ctk.CTk):
         self.entry_relatado.pack(fill="x")
         self.entry_relatado.bind("<FocusIn>",  lambda e: self.entry_relatado.configure(border_color=COR_PRIMARIA, fg_color="white"))
         self.entry_relatado.bind("<FocusOut>", lambda e: self.entry_relatado.configure(border_color=COR_BORDA, fg_color="#F8F9FC"))
+
+        # Grid aula + horário (abaixo da data)
+        row3 = ctk.CTkFrame(c_id, fg_color="transparent")
+        row3.pack(fill="x", padx=18, pady=(0, 14))
+
+        frame_aula = ctk.CTkFrame(row3, fg_color="transparent")
+        frame_aula.pack(side="left", padx=(0, 12))
+        ctk.CTkLabel(frame_aula, text="Aula",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=COR_SUBTEXTO, anchor="w").pack(anchor="w", pady=(0, 3))
+        self.combo_aula = ctk.CTkComboBox(frame_aula, width=130, height=36, corner_radius=8,
+                                          border_width=1, border_color=COR_BORDA,
+                                          fg_color="#F8F9FC", text_color=COR_TEXTO,
+                                          font=ctk.CTkFont(size=12),
+                                          values=["1ª aula", "2ª aula", "3ª aula",
+                                                  "4ª aula", "5ª aula", "6ª aula"])
+        self.combo_aula.set("")
+        self.combo_aula.pack(anchor="w")
+
+        frame_hora = ctk.CTkFrame(row3, fg_color="transparent")
+        frame_hora.pack(side="left", padx=(0, 12))
+        ctk.CTkLabel(frame_hora, text="Horário da aula",
+                     font=ctk.CTkFont(size=11, weight="bold"),
+                     text_color=COR_SUBTEXTO, anchor="w").pack(anchor="w", pady=(0, 3))
+        self.entry_horario = ctk.CTkEntry(frame_hora, width=130, height=36, corner_radius=8,
+                                          border_width=1, border_color=COR_BORDA,
+                                          fg_color="#F8F9FC", text_color=COR_TEXTO,
+                                          placeholder_text="Ex: 09:40",
+                                          font=ctk.CTkFont(size=12))
+        self.entry_horario.pack(anchor="w")
+        self.entry_horario.bind("<FocusIn>",  lambda e: self.entry_horario.configure(border_color=COR_PRIMARIA, fg_color="white"))
+        self.entry_horario.bind("<FocusOut>", lambda e: self.entry_horario.configure(border_color=COR_BORDA, fg_color="#F8F9FC"))
 
         # ══ 2. CARD — Motivo da Ocorrência ══════════════════
         c_oc = self._card(self.scroll, "Motivo da Ocorrência", "⚠️")
@@ -855,7 +802,7 @@ class App(ctk.CTk):
 
         self.btn_gerar = ctk.CTkButton(
             btn_frame,
-            text="🗃   Gerar PDF e Enviar",
+            text="🗃   Gerar PDF e Notificar no WhatsApp",
             font=ctk.CTkFont(size=14, weight="bold"),
             height=52,
             corner_radius=12,
@@ -890,6 +837,8 @@ class App(ctk.CTk):
         serie = self.entry_serie.get().strip()
         data = self.entry_data.get().strip()
         relatado = self.entry_relatado.get().strip()
+        aula = self.combo_aula.get().strip()
+        horario = self.entry_horario.get().strip()
 
         campos_vazios = []
         if not aluno:
@@ -920,6 +869,16 @@ class App(ctk.CTk):
             )
             self.entry_data.focus()
             return
+
+        if horario:
+            import re
+            if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", horario):
+                messagebox.showwarning(
+                    "Horário inválido",
+                    f'O horário "{horario}" não é válido.\n\nUse o formato HH:MM (ex: 09:40).'
+                )
+                self.entry_horario.focus()
+                return
         
         relato_atual = self.text_relato.get("1.0", "end-1c")
         if len(relato_atual) > 400:
@@ -933,7 +892,7 @@ class App(ctk.CTk):
         if MODO_TESTE:
             resposta = messagebox.askyesno(
                 "Confirmar (modo teste)",
-                f"MODO TESTE — sem envio de e-mail/WhatsApp.\n\n"
+                f"MODO TESTE — sem WhatsApp.\n\n"
                 f"Deseja gerar e salvar a ocorrência de\n\n"
                 f"Aluno: {aluno}\n"
                 f"Data:  {data}\n\n"
@@ -942,10 +901,10 @@ class App(ctk.CTk):
         else:
             resposta = messagebox.askyesno(
                 "Confirmar",
-                f"Deseja gerar e enviar a ocorrência de\n\n"
+                f"Deseja gerar a ocorrência e notificar no WhatsApp?\n\n"
                 f"Aluno: {aluno}\n"
                 f"Data:  {data}\n\n"
-                f"O PDF será enviado para:\n" + "\n".join(EMAIL_DESTINO)
+                f"O PDF será salvo localmente e a notificação será enviada."
             )
         if not resposta:
             return
@@ -959,6 +918,8 @@ class App(ctk.CTk):
             "aluno":        aluno,
             "serie":        serie,
             "data":         data,
+            "aula":         aula,
+            "horario":      horario,
             "relatado_por": relatado,
             "relato":       self.text_relato.get("1.0", "end").strip(),
             "outra_desc":   self.entry_outra.get().strip(),
@@ -974,62 +935,48 @@ class App(ctk.CTk):
             pdf_path = gerar_pdf(dados)
         except Exception as e:
             messagebox.showerror("Erro ao gerar PDF", str(e))
-            self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
+            self.btn_gerar.configure(text="🗃   Gerar PDF e Notificar no WhatsApp", state="normal", fg_color=COR_PRIMARIA)
             self._status_var.set("● Erro ao gerar PDF")
             return
 
         if MODO_TESTE:
-            # Modo teste: não tenta e-mail nem WhatsApp, só confirma o PDF salvo.
+            # Modo teste: não tenta WhatsApp, só confirma o PDF salvo.
             self._status_var.set("✅ PDF salvo (modo teste)!")
             self.btn_gerar.configure(text="✅  PDF Gerado (modo teste)!", fg_color="#0A7C3A")
             messagebox.showinfo(
                 "PDF salvo (modo teste) ✅",
                 f"PDF gerado e salvo com sucesso!\n\nArquivo: {pdf_path}\n\n"
-                f"Envio de e-mail e WhatsApp foram pulados porque o .env "
+                f"O WhatsApp foi pulado porque o .env "
                 f"está ausente/incompleto."
             )
-            self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
+            self.btn_gerar.configure(text="🗃   Gerar PDF e Notificar no WhatsApp", state="normal", fg_color=COR_PRIMARIA)
             self._status_var.set("● Pronto para novo registro (modo teste)")
             os.startfile(os.path.join(os.path.expanduser("~"), "Documents", "Ocorrencias_JPII"))
             return
 
-        self._status_var.set("● Enviando e-mail...")
-        self.update_idletasks()
+        # Envia o WhatsApp (Não mexer na tela durante o envio)
+        numero_wp = dados.get("whatsapp", "")
+        if numero_wp:
+            self._status_var.set("● Enviando WhatsApp...")
+            self.update_idletasks()
+            # O sistema vai focar no Chrome agora
+            enviar_whatsapp(numero_wp, pdf_path, dados["aluno"])
 
-        ok = enviar_email(pdf_path, aluno, dados["data"])
+        # SÓ DEPOIS de tentar ou enviar o Zap, mostra o aviso na tela
+        self._status_var.set("✅ Ocorrência registrada com sucesso!")
+        self.btn_gerar.configure(text="✅  PDF Gerado e Notificado!", fg_color="#0A7C3A")
+        messagebox.showinfo(
+            "Sucesso! ✅",
+            f"PDF gerado com sucesso!\n\n"
+            f"Arquivo: {pdf_path}"
+        )
+        # Restaura botão após sucesso
+        self.btn_gerar.configure(text="🗃   Gerar PDF e Notificar no WhatsApp", state="normal", fg_color=COR_PRIMARIA)
+        self._status_var.set("● Pronto para novo registro")
 
-        if ok:
-            # 1. Envia o whatsapp primeiro, (Não mexer na tela durante o envio)
-            numero_wp = dados.get("whatsapp", "")
-            if numero_wp:
-                self._status_var.set("● Enviando WhatsApp...")
-                self.update_idletasks()
-                # O sistema vai focar no Chrome agora
-                enviar_whatsapp(numero_wp, pdf_path, dados["aluno"])
-
-           # 2. SÓ DEPOIS de tentar ou enviar o Zap, mostra o aviso na tela
-            self._status_var.set("✅ Ocorrência enviada com sucesso!")
-            self.btn_gerar.configure(text="✅  PDF Gerado e Enviado!", fg_color="#0A7C3A")
-            messagebox.showinfo(
-                "Sucesso! ✅",
-                f"PDF gerado e enviado com sucesso!\n\n"
-                f"Arquivo: {pdf_path}\n"
-                f"Enviado para:\n" + "\n".join(EMAIL_DESTINO)
-            )
-            # Restaura botão após sucesso
-            self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
-            self._status_var.set("● Pronto para novo registro")
-
-            # 3. POR ÚLTIMO, abre a pasta do Windows
-            # Isso evita que a pasta do Windows não permita que o "pywhatkit" finalize o seu processo primeiro
-            os.startfile(os.path.join(os.path.expanduser("~"), "Documents", "Ocorrencias_JPII"))
-        else:
-            self.btn_gerar.configure(text="🗃   Gerar PDF e Enviar", state="normal", fg_color=COR_PRIMARIA)
-            self._status_var.set("⚠  PDF salvo, mas e-mail falhou")
-            messagebox.showwarning(
-                "PDF gerado, mas e-mail falhou",
-                f"O PDF foi salvo em:\n{pdf_path}"
-            )
+        # POR ÚLTIMO, abre a pasta do Windows
+        # Isso evita que a pasta do Windows não permita que o "pywhatkit" finalize o seu processo primeiro
+        os.startfile(os.path.join(os.path.expanduser("~"), "Documents", "Ocorrencias_JPII"))
 
 
 # ══════════════════════════════════════════════

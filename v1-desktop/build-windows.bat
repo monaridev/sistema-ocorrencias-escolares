@@ -12,15 +12,12 @@ python -m PyInstaller ^
   --icon "escolaicone.ico" ^
   --collect-all customtkinter ^
   --collect-all pywhatkit ^
-  --collect-data googleapiclient ^
   --hidden-import pywhatkit ^
   "ocorrenciaescolar.py"
 
 if errorlevel 1 exit /b %errorlevel%
 
 set "PORTABLE_DIR=%CD%\dist\SistemaOcorrencias"
-for %%F in (.env credentials.json token.json) do (
-  if exist "%%F" copy /Y "%%F" "%PORTABLE_DIR%\%%F" >nul
-)
+if exist ".env" copy /Y ".env" "%PORTABLE_DIR%\.env" >nul
 
 echo Pacote portatil criado em: %PORTABLE_DIR%

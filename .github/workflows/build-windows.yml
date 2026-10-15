@@ -1,0 +1,31 @@
+name: Build V1 Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: python -m pip install -r v1-desktop/requirements-build.txt
+
+      - name: Build com PyInstaller
+        run: >
+          python -m PyInstaller --noconfirm --clean --onedir --windowed
+          --name SistemaOcorrencias --icon "escolaicone.ico"
+          --collect-all customtkinter --collect-all pywhatkit
+          --hidden-import pywhatkit "ocorrenciaescolar.py"
+        working-directory: v1-desktop
+
+      - name: Publicar pacote portátil
+        uses: actions/upload-artifact@v4
+        with:
+          name: SistemaOcorrencias-windows
+          path: v1-desktop/dist/SistemaOcorrencias

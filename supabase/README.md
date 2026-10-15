@@ -20,7 +20,7 @@ Publicar `manage-users` e `send-occurrence` usando os respectivos `index.ts` e `
 
 ## Gmail
 
-1. Na máquina administrativa, executar `python3 scripts/authorize_gmail.py` e autorizar a conta remetente no navegador. Exige `google-auth-oauthlib` e o cliente OAuth desktop já usado pela V1.
+1. Na máquina administrativa, executar `GMAIL_SENDER=<gmail-da-escola> python3 scripts/authorize_gmail.py` e autorizar a conta remetente no navegador. Exige `google-auth-oauthlib` e o cliente OAuth desktop já usado pela V1.
 2. Guardar o conteúdo de `.local/gmail-oauth.json` no segredo `GMAIL_OAUTH` da Edge Function. Estrutura: `sender`, `client_id`, `client_secret`, `refresh_token`. Nunca colocar esses valores em Dart, Git ou APK.
 3. No app, entrar como admin, abrir **Configurar e-mail**, conferir os destinatários de teste e habilitar o envio.
 4. Registrar ocorrência de teste, abrir detalhes e enviar. Confirmar recebimento e testar repetição do botão: a mesma versão já enviada não gera outro e-mail.
